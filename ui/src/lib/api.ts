@@ -28,6 +28,8 @@ export type VoyageDTO = {
   cooldown_sec: number;
   category: string;
   verifier_prompt: string | null;
+  icon: string | null;
+  theme_keyword: string | null;
   active: boolean;
   done_today?: boolean;
   today_attempt?: VoyageLogDTO | null;
@@ -202,6 +204,20 @@ export async function getNudges(): Promise<{
   nudges: { crewmate: string; content: string; ts: number; reason: string }[];
 }> {
   return get(`${CREW}/nudges`);
+}
+
+export async function crewOneLiner(
+  crewmate: string,
+  intent: string,
+  payload: Record<string, unknown> = {},
+): Promise<{ crewmate: string; content: string }> {
+  const r = await fetch(`${CREW}/${crewmate}/one_liner`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ intent, payload }),
+  });
+  if (!r.ok) throw new Error(`one_liner failed: ${r.status}`);
+  return r.json();
 }
 
 // SSE chat helper. Returns an async iterator of (event, data) tuples.
