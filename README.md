@@ -4,6 +4,34 @@ A personal One Piece-themed habit tracker PWA. You play the Captain of your own 
 
 Three-container app (backend + crew + ui) you run with `docker compose up`.
 
+## Screenshots
+
+**Today's Log Pose** - the dashboard. Captain card, Crew morale, Berries, Grand Line strip, four Haki rings, a "Next up" card and the daily voyage rail.
+
+![Home dashboard](docs/screenshots/01-home-dashboard.png)
+
+**All voyages** - rituals, crew duties, and one-shot bounty missions in one tabbed list. Each voyage now has its own pixel icon; the clock badge marks `timer` voyages, the camera badge marks `marine_photo` voyages, and finished voyages strike through with a check.
+
+![All voyages](docs/screenshots/08-all-voyages.png)
+
+**Marine Verifier (Gemini 2.5 Flash Vision)** - photo evidence in, structured verdict out. Submit a photo for any `marine_photo` voyage; the verifier returns `verified` / `rejected` with a one-sentence rationale. Cheating fails on the rationale, not on a regex.
+
+| Capture | Rejected | Retry |
+|---|---|---|
+| ![Capture step](docs/screenshots/02-marine-verifier-attempt.png) | ![Rejected verdict](docs/screenshots/03-marine-verifier-rejected.png) | ![Valid retake](docs/screenshots/04-marine-verifier-valid-photo.png) |
+
+**Grand Line map** - the long-arc motivator. Each island unlocks at a Bounty milestone (East Blue -> Reverse Mountain -> Alabasta -> ... -> Laugh Tale). The percent ring on the next island is your real progress.
+
+![Grand Line map](docs/screenshots/05-grand-line-map.png)
+
+**Journal** - every voyage attempt, including the photo, the verdict, and the Marine Verifier's rationale. Self-reported entries are tagged too, so you can scan a day at a glance.
+
+![Journal](docs/screenshots/06-journal.png)
+
+**Crew Quarters (Den Den Mushi)** - one-tap 1-on-1 chats or a group call with all five crewmates. Group replies are tagged-block streamed (`<luffy>` / `<nami>` / `<robin>` / ...) so the SSE pane renders each persona's bubble live as it speaks.
+
+![Crew chat](docs/screenshots/07-crew-chat.png)
+
 ## Services
 
 | Service | Port | What it does |
