@@ -3,17 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { ArrowLeft, Camera, CheckCircle2, Clock, Flame, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  CheckCircle2,
+  Flame,
+  RotateCcw,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { attemptVoyage, getVoyage } from "@/lib/api";
 import type { AttemptResult, VoyageDTO } from "@/lib/api";
 import { BorderBeam } from "@/components/magicui/border-beam";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { DropReveal } from "@/components/DropReveal";
 import { PixelPortrait } from "@/components/PixelPortrait";
-import { TimerStage } from "@/components/TimerStage";
 import { VictoryReinforce } from "@/components/VictoryReinforce";
-import { Term } from "@/components/Term";
 import { HAKI_ACCENT, HAKI_LABEL, spritePath, voyageIcon } from "@/lib/sprites";
+import { WINDOW_ACCENT, WINDOW_LABEL } from "@/lib/timeWindow";
 
 type Stage = "idle" | "captured" | "verifying" | "result";
 
@@ -48,26 +55,37 @@ export default function VoyageDetailPage() {
     setError(null);
   }
 
-  const submit = useCallback(async () => {
-    if (!voyage) return;
-    setError(null);
-    setStage("verifying");
-    try {
-      const mode = voyage.verification_mode;
-      const r = await attemptVoyage(voyageId, {
-        mode,
-        image: mode === "marine_photo" ? image ?? undefined : undefined,
-      });
-      setResult(r);
-      setStage("result");
-      if (r.drop && r.drop.kind !== "nothing") {
-        setDropOpen(true);
+  function clearImage() {
+    setImage(null);
+    setPreview(null);
+    setStage("idle");
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  // submit() always works - photo is optional. If the user attached one we
+  // ship it; if not we just mark the voyage complete and take the base reward.
+  const submit = useCallback(
+    async (withPhoto: boolean) => {
+      if (!voyage) return;
+      setError(null);
+      setStage("verifying");
+      try {
+        const r = await attemptVoyage(voyageId, {
+          mode: "self",
+          image: withPhoto && image ? image : undefined,
+        });
+        setResult(r);
+        setStage("result");
+        if (r.drop && r.drop.kind !== "nothing") {
+          setDropOpen(true);
+        }
+      } catch (e) {
+        setError(String(e));
+        setStage(image ? "captured" : "idle");
       }
-    } catch (e) {
-      setError(String(e));
-      setStage(image ? "captured" : "idle");
-    }
-  }, [voyage, voyageId, image]);
+    },
+    [voyage, voyageId, image],
+  );
 
   function reset() {
     setImage(null);
@@ -90,11 +108,13 @@ export default function VoyageDetailPage() {
       </div>
     );
 
-  const isMarine = voyage.verification_mode === "marine_photo";
-  const isTimer = voyage.verification_mode === "timer";
   const haki = HAKI_ACCENT[voyage.haki_affinity];
   const streak = voyage.streak?.current ?? 0;
   const hasStreak = streak > 0;
+  const bonusPct = voyage.evidence_bonus_pct ?? 0;
+  const windowKey = voyage.time_window ?? "anytime";
+  const windowAccent = WINDOW_ACCENT[windowKey];
+  const verifying = stage === "verifying";
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5">
@@ -127,10 +147,13 @@ export default function VoyageDetailPage() {
               <Chip>+{voyage.base_bounty.toLocaleString()} bounty</Chip>
               <Chip>+{voyage.base_berries} berries</Chip>
               <Chip color={haki}>{HAKI_LABEL[voyage.haki_affinity]}</Chip>
-              <Chip>
-                <VerifyIcon mode={voyage.verification_mode} className="mr-1 inline-block h-3 w-3 align-text-bottom" />
-                {voyage.verification_mode.replace("_", " ")}
-              </Chip>
+              <Chip color={windowAccent}>{WINDOW_LABEL[windowKey]}</Chip>
+              {bonusPct > 0 && (
+                <Chip color="#fde047">
+                  <Sparkles className="mr-1 inline-block h-3 w-3 align-text-bottom" />
+                  +{bonusPct}% with photo
+                </Chip>
+              )}
               {hasStreak && (
                 <Chip color="#fb923c">
                   <Flame className="mr-1 inline-block h-3 w-3 align-text-bottom" />
@@ -142,108 +165,122 @@ export default function VoyageDetailPage() {
         </div>
       </div>
 
-      {/* Capture / submit */}
+      {/* Completion surface */}
       {stage !== "result" && (
-        isTimer ? (
-          <TimerStage
-            voyageId={voyageId}
-            durationSec={voyage.cooldown_sec || 60}
-            title={voyage.title}
-            accentColor={haki}
-            submitting={stage === "verifying"}
-            onComplete={submit}
-            onAbort={() => router.back()}
-          />
-        ) : (
-          <div className="surface px-4 py-4">
-            {isMarine ? (
-              <>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-                  <Camera className="h-3.5 w-3.5" />
-                  <Term k="marine_photo">Marine verifier</Term>
-                </div>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Snap the proof. The Den Den Mushi will judge.
-                </p>
-                {preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={preview}
-                    alt="evidence"
-                    className="mt-3 max-h-80 w-full rounded-2xl object-cover"
-                  />
-                ) : (
-                  <button
-                    onClick={() => inputRef.current?.click()}
-                    className="mt-3 flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] text-zinc-400 hover:bg-white/[0.04]"
-                  >
-                    <Camera className="h-7 w-7" />
-                    <span className="text-xs uppercase tracking-widest">
-                      Tap to capture
-                    </span>
-                  </button>
-                )}
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={onPick}
-                  className="hidden"
-                />
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <Term k="self">Self report</Term>
-                </div>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Mark it done when the deed is real.
-                </p>
-              </>
-            )}
-
-            {error && (
-              <div className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-                {error}
+        <div className="surface px-4 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Mark complete
               </div>
-            )}
+              <p className="mt-1 text-xs text-zinc-500">
+                Tap done when the deed is real. Photo is optional - snap one for
+                {bonusPct > 0 ? ` +${bonusPct}% bonus bounty.` : " your records."}
+              </p>
+            </div>
+          </div>
 
-            <div className="mt-4 flex gap-2">
-              {isMarine && preview && (
+          {preview ? (
+            <div className="relative mt-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt="evidence"
+                className="max-h-80 w-full rounded-2xl object-cover"
+              />
+              <button
+                aria-label="Remove photo"
+                onClick={clearImage}
+                disabled={verifying}
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-zinc-100 hover:bg-black/80 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={verifying}
+              className="mt-4 flex h-44 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] text-zinc-400 hover:bg-white/[0.04] disabled:opacity-40"
+            >
+              <Camera className="h-7 w-7" />
+              <span className="text-xs uppercase tracking-widest">
+                Tap to add proof (optional)
+              </span>
+              {bonusPct > 0 && (
+                <span className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                  +{bonusPct}% bounty &middot; +{bonusPct}% berries
+                </span>
+              )}
+            </button>
+          )}
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onPick}
+            className="hidden"
+          />
+
+          {error && (
+            <div className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+              {error}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            {preview ? (
+              <>
                 <button
-                  onClick={() => {
-                    setImage(null);
-                    setPreview(null);
-                    setStage("idle");
-                    if (inputRef.current) inputRef.current.value = "";
-                  }}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/10 px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-300 hover:bg-white/5"
+                  onClick={clearImage}
+                  disabled={verifying}
+                  className="flex items-center justify-center gap-1.5 rounded-full border border-white/10 px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-300 hover:bg-white/5 disabled:opacity-40 sm:flex-1"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Retake
                 </button>
-              )}
-              <ShimmerButton
-                onClick={submit}
-                disabled={stage === "verifying" || (isMarine && !image)}
-                borderRadius="9999px"
-                background="linear-gradient(135deg, #f59e0b, #f97316)"
-                shimmerColor="#fff5cc"
-                className="flex-1 text-xs uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {stage === "verifying"
-                  ? isMarine
-                    ? "Den Den Mushi calling..."
-                    : "Stamping..."
-                  : isMarine
-                    ? "Submit"
-                    : "Mark complete"}
-              </ShimmerButton>
-            </div>
+                <ShimmerButton
+                  onClick={() => submit(true)}
+                  disabled={verifying}
+                  borderRadius="9999px"
+                  background="linear-gradient(135deg, #f59e0b, #f97316)"
+                  shimmerColor="#fff5cc"
+                  className="text-xs uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40 sm:flex-[2]"
+                >
+                  {verifying
+                    ? "Logging..."
+                    : bonusPct > 0
+                      ? `Submit with photo (+${bonusPct}%)`
+                      : "Submit with photo"}
+                </ShimmerButton>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => inputRef.current?.click()}
+                  disabled={verifying}
+                  className="flex items-center justify-center gap-1.5 rounded-full border border-white/10 px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-300 hover:bg-white/5 disabled:opacity-40 sm:flex-1"
+                >
+                  <Camera className="h-3 w-3" />
+                  Add photo
+                </button>
+                <ShimmerButton
+                  onClick={() => submit(false)}
+                  disabled={verifying}
+                  borderRadius="9999px"
+                  background="linear-gradient(135deg, #facc15, #f59e0b)"
+                  shimmerColor="#fff5cc"
+                  className="text-xs uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40 sm:flex-[2]"
+                >
+                  {verifying ? "Stamping..." : "Mark complete"}
+                </ShimmerButton>
+              </>
+            )}
           </div>
-        )
+        </div>
       )}
 
       {stage === "result" && result && (
@@ -281,18 +318,6 @@ function Chip({
   );
 }
 
-function VerifyIcon({
-  mode,
-  className,
-}: {
-  mode: VoyageDTO["verification_mode"];
-  className?: string;
-}) {
-  if (mode === "marine_photo") return <Camera className={className} />;
-  if (mode === "timer") return <Clock className={className} />;
-  return <CheckCircle2 className={className} />;
-}
-
 function ResultPanel({
   result,
   onClose,
@@ -303,6 +328,7 @@ function ResultPanel({
   onBack: () => void;
 }) {
   const ok = ["verified", "self_reported", "timer_done"].includes(result.verdict);
+  const bonus = result.bonus_applied;
 
   return (
     <motion.div
@@ -342,6 +368,24 @@ function ResultPanel({
               </div>
             </div>
           </div>
+        )}
+        {ok && bonus && (result.bonus_bounty > 0 || result.bonus_berries > 0) && (
+          <motion.div
+            initial={{ scale: 0.96, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.18, type: "spring", stiffness: 280 }}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[11px] uppercase tracking-widest text-amber-300"
+          >
+            <Sparkles className="h-3 w-3" />
+            Photo bonus +{result.evidence_bonus_pct}% &middot;{" "}
+            +{result.bonus_bounty.toLocaleString()} B &middot;{" "}
+            +{result.bonus_berries.toLocaleString()} ₿
+          </motion.div>
+        )}
+        {ok && !bonus && result.evidence_bonus_pct > 0 && !result.image_path && (
+          <p className="mt-3 text-[11px] uppercase tracking-widest text-zinc-500">
+            Snap proof next time for +{result.evidence_bonus_pct}% bonus
+          </p>
         )}
       </div>
 
