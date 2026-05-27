@@ -71,6 +71,51 @@ SPRITES: dict[str, str] = {
         "A single white-and-gold feather quill writing on a small rolled "
         "parchment, cream tile background."
     ),
+    "voyages/scroll.png": (
+        "An open scroll of paper with simple ink characters and a wax seal, "
+        "pale cream tile background."
+    ),
+    "voyages/water.png": (
+        "A tall glass beaker of clear blue water with a single highlight "
+        "and a small electrolyte salt sachet beside it, sea-cyan tile "
+        "background."
+    ),
+    "voyages/pill.png": (
+        "A single medication capsule, half white half cyan, with a tiny "
+        "sparkle, soft mint tile background."
+    ),
+    "voyages/brew.png": (
+        "A steaming brown mug of coffee with a small white heart in the "
+        "foam, warm caramel-brown tile background."
+    ),
+    "voyages/meal.png": (
+        "A round white plate top-down view with a piece of grilled chicken, "
+        "broccoli, and a half tomato, warm cream tile background."
+    ),
+    "voyages/bike.png": (
+        "A side view of a simple red road bicycle with two large wheels "
+        "and a low frame, sky-blue tile background."
+    ),
+    "voyages/cold.png": (
+        "A bright cyan snowflake with a small water droplet at the bottom, "
+        "icy pale-blue tile background, subtle frosty glow."
+    ),
+    "voyages/boots.png": (
+        "A pair of brown leather walking boots side by side with laces, "
+        "earthy tan tile background."
+    ),
+    "voyages/moon.png": (
+        "A small crescent moon with two tiny stars and a single sparkle, "
+        "deep indigo tile background."
+    ),
+    "voyages/phone-down.png": (
+        "A smartphone lying face-down on a flat surface with a small Zzz "
+        "symbol above it, calm lavender tile background."
+    ),
+    "voyages/book.png": (
+        "An open book with two visible pages and a red bookmark ribbon, "
+        "warm parchment tile background."
+    ),
 
     "captain/tier-1.png": (
         "A young chibi pirate captain in a plain white shirt and shorts, "
