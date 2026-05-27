@@ -12,6 +12,7 @@ POST /api/voyages/{id}/attempt          - multipart photo or self-report attempt
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import logging
 import secrets
@@ -33,9 +34,12 @@ log = logging.getLogger("logpose.voyages")
 
 
 HAKI_VALUES = {"buso", "vitality", "kenbun", "haoshoku"}
+# `timer` and `stillness` kept here only to accept legacy clients; the actual
+# completion path treats every non-`marine_photo` mode as a manual self-report.
 VERIFICATION_MODES = {"self", "marine_photo", "timer", "stillness"}
 RECURRENCES = {"daily", "weekly", "one_shot"}
 CATEGORIES = {"straw_hat_ritual", "crew_duty", "bounty_mission"}
+TIME_WINDOWS = {"morning", "midday", "evening", "night", "anytime"}
 
 
 class VoyageIn(BaseModel):
@@ -51,6 +55,8 @@ class VoyageIn(BaseModel):
     verifier_prompt: str | None = None
     icon: str | None = None
     theme_keyword: str | None = None
+    time_window: str = "anytime"
+    evidence_bonus_pct: int = Field(25, ge=0, le=200)
     active: bool = True
 
 
@@ -63,6 +69,8 @@ def _validate_enums(v: VoyageIn) -> None:
         raise HTTPException(400, f"recurrence must be one of {sorted(RECURRENCES)}")
     if v.category not in CATEGORIES:
         raise HTTPException(400, f"category must be one of {sorted(CATEGORIES)}")
+    if v.time_window not in TIME_WINDOWS:
+        raise HTTPException(400, f"time_window must be one of {sorted(TIME_WINDOWS)}")
 
 
 def _row(conn, voyage_id: int):
@@ -92,8 +100,10 @@ async def create_voyage(body: VoyageIn) -> dict:
             INSERT INTO voyages (
                 title, description, haki_affinity, base_bounty, base_berries,
                 verification_mode, recurrence, cooldown_sec, category,
-                verifier_prompt, icon, theme_keyword, active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verifier_prompt, icon, theme_keyword,
+                time_window, evidence_bonus_pct,
+                active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 body.title,
@@ -108,6 +118,8 @@ async def create_voyage(body: VoyageIn) -> dict:
                 body.verifier_prompt,
                 body.icon,
                 body.theme_keyword,
+                body.time_window,
+                body.evidence_bonus_pct,
                 1 if body.active else 0,
                 ts,
                 ts,
@@ -201,8 +213,9 @@ async def update_voyage(voyage_id: int, body: VoyageIn) -> dict:
                 title=?, description=?, haki_affinity=?, base_bounty=?,
                 base_berries=?, verification_mode=?, recurrence=?,
                 cooldown_sec=?, category=?, verifier_prompt=?,
-                icon=?, theme_keyword=?, active=?,
-                updated_at=?
+                icon=?, theme_keyword=?,
+                time_window=?, evidence_bonus_pct=?,
+                active=?, updated_at=?
             WHERE id=?
             """,
             (
@@ -218,6 +231,8 @@ async def update_voyage(voyage_id: int, body: VoyageIn) -> dict:
                 body.verifier_prompt,
                 body.icon,
                 body.theme_keyword,
+                body.time_window,
+                body.evidence_bonus_pct,
                 1 if body.active else 0,
                 now_ts(),
                 voyage_id,
@@ -243,17 +258,79 @@ async def deactivate_voyage(voyage_id: int) -> dict:
 # --------------------------------------------------------------------- attempt
 
 
-def _save_image(image_bytes: bytes, suffix: str) -> str:
-    """Persist the uploaded image under data/media/, return relative path."""
+def _save_evidence(
+    *,
+    voyage_id: int,
+    image_bytes: bytes,
+    suffix: str,
+    captured_at: int,
+    local_date: str,
+    local_time: str,
+) -> tuple[str, str]:
+    """Persist the uploaded evidence file. Returns (relative_path, sha256).
+
+    The path is date-bucketed (`media/YYYY-MM-DD/<voyage>_<HHMMSS>_<rand>.<ext>`)
+    so the future analytics dashboard can browse a day's evidence at a
+    glance without an index. Returned path is relative to media_dir's
+    parent so the existing /media StaticFiles mount serves it directly.
+    """
     safe_suffix = "".join(c for c in suffix if c.isalnum() or c in ".-_") or ".jpg"
     if not safe_suffix.startswith("."):
         safe_suffix = "." + safe_suffix
     media_root = Path(settings.media_dir)
-    media_root.mkdir(parents=True, exist_ok=True)
-    fname = f"{now_ts()}_{secrets.token_hex(8)}{safe_suffix}"
-    p = media_root / fname
+    day_dir = media_root / local_date
+    day_dir.mkdir(parents=True, exist_ok=True)
+    fname = (
+        f"voyage{voyage_id}_"
+        f"{local_time.replace(':', '')}_"
+        f"{secrets.token_hex(4)}{safe_suffix}"
+    )
+    p = day_dir / fname
     p.write_bytes(image_bytes)
-    return str(p.relative_to(media_root.parent))
+    sha = hashlib.sha256(image_bytes).hexdigest()
+    return str(p.relative_to(media_root.parent)), sha
+
+
+def _record_evidence_media(
+    *,
+    voyage_id: int,
+    log_id: int | None,
+    captured_at: int,
+    local_date: str,
+    local_time: str,
+    relative_path: str,
+    mime_type: str | None,
+    size_bytes: int,
+    sha256: str,
+    verdict: str | None,
+    confidence: float | None,
+    bonus_applied: bool,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO evidence_media (
+                voyage_id, log_id, captured_at, local_date, local_time, tz,
+                relative_path, mime_type, size_bytes, sha256,
+                verdict, confidence, bonus_applied
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                voyage_id,
+                log_id,
+                captured_at,
+                local_date,
+                local_time,
+                settings.logpose_tz,
+                relative_path,
+                mime_type,
+                size_bytes,
+                sha256,
+                verdict,
+                confidence,
+                1 if bonus_applied else 0,
+            ),
+        )
 
 
 def _update_streak(conn, voyage_id: int, today: str) -> dict:
@@ -337,12 +414,21 @@ async def attempt_voyage(
     mode: str = Form("self"),
     image: Optional[UploadFile] = File(default=None),
 ) -> dict:
-    """Submit an attempt. Returns verdict + bounty/berries awarded + any drop.
+    """Mark a voyage complete. The photo is always optional.
 
-    ``mode`` overrides the voyage default for one attempt - useful for
-    timer voyages that can be self-reported when the timer naturally
-    completed, or marine_photo voyages that can be self-reported in
-    emergencies (this just won't earn the full bounty).
+    Reward flow:
+    - Tapping "Mark complete" always earns the base bounty + berries for an
+      active daily.
+    - Attaching a photo runs the Marine Verifier (when the voyage has a
+      `verifier_prompt`). On a `verified` or non-rejected outcome the
+      Captain also earns the voyage's `evidence_bonus_pct` on top.
+    - A rejected photo still completes the voyage at the base reward but
+      flags `bonus_applied=false` and surfaces the rejection reasoning.
+
+    Every uploaded image is persisted under `media/<YYYY-MM-DD>/...` with a
+    sidecar `evidence_media` row (sha256, size, captured_at in Asia/Kolkata)
+    so a future analytics dashboard can browse evidence by day, voyage,
+    or verdict.
     """
     with connect() as conn:
         row = _row(conn, voyage_id)
@@ -352,64 +438,100 @@ async def attempt_voyage(
             raise HTTPException(400, "voyage is inactive")
         voyage = _voyage_dict(row)
 
-    effective_mode = mode or voyage["verification_mode"]
     today = _local_date()
     attempted_at = now_ts()
+    local_dt = datetime.datetime.fromtimestamp(attempted_at, tz=settings.zone)
+    local_date = local_dt.date().isoformat()
+    local_time = local_dt.time().strftime("%H:%M:%S")
 
-    verifier_result: VerifierResult | None = None
+    image_bytes: bytes | None = None
+    image_mime: str | None = None
     image_path: str | None = None
+    image_sha: str | None = None
+    image_size = 0
+    verifier_result: VerifierResult | None = None
 
-    if effective_mode == "marine_photo":
-        if image is None:
-            raise HTTPException(400, "image required for marine_photo verification")
+    if image is not None:
         data = await image.read()
         if not data:
             raise HTTPException(400, "image is empty")
         suffix = ""
         if image.filename and "." in image.filename:
             suffix = "." + image.filename.rsplit(".", 1)[1]
-        image_path = _save_image(data, suffix)
-        verifier_result = await verify_photo(
+        image_bytes = data
+        image_mime = image.content_type or "image/jpeg"
+        image_size = len(data)
+        image_path, image_sha = _save_evidence(
+            voyage_id=voyage_id,
             image_bytes=data,
-            mime_type=image.content_type or "image/jpeg",
-            title=voyage["title"],
-            description=voyage["description"],
-            verifier_prompt=voyage.get("verifier_prompt"),
+            suffix=suffix,
+            captured_at=attempted_at,
+            local_date=local_date,
+            local_time=local_time,
         )
-        verdict = verifier_result.verdict
+        if voyage.get("verifier_prompt"):
+            verifier_result = await verify_photo(
+                image_bytes=data,
+                mime_type=image_mime,
+                title=voyage["title"],
+                description=voyage["description"],
+                verifier_prompt=voyage["verifier_prompt"],
+            )
+
+    # The base verdict is always "the voyage happened". A rejected photo
+    # downgrades it to self_reported (no bonus) but does NOT block completion.
+    if verifier_result and verifier_result.verdict == "verified":
+        verdict = "verified"
         reasoning = verifier_result.reasoning
         confidence = verifier_result.confidence
-    elif effective_mode == "timer":
-        verdict = "timer_done"
-        reasoning = "Timer ran to completion."
-        confidence = 1.0
-    elif effective_mode == "self":
+    elif verifier_result and verifier_result.verdict == "rejected":
+        verdict = "self_reported"
+        reasoning = (
+            "Photo didn't convince the Marine Verifier - base reward only. "
+            f"Reason: {verifier_result.reasoning}"
+        )
+        confidence = verifier_result.confidence
+    elif image_bytes is not None:
+        verdict = "self_reported"
+        reasoning = "Photo logged - no verifier configured for this voyage."
+        confidence = 0.75
+    else:
         verdict = "self_reported"
         reasoning = "Self-reported by Captain."
         confidence = 0.5
-    elif effective_mode == "stillness":
-        verdict = "self_reported"
-        reasoning = "Stillness check passed."
-        confidence = 0.8
-    else:
-        raise HTTPException(400, f"unsupported mode '{effective_mode}'")
 
     successful = verdict in ("verified", "self_reported", "timer_done")
+
     bounty_awarded = 0
     berries_awarded = 0
+    bonus_bounty = 0
+    bonus_berries = 0
+    bonus_applied = False
     drop_info = {"kind": "nothing"}
     captain_after = None
     streak_after = None
     tier_up = None
 
     if successful:
-        # Self-reported on a marine_photo voyage = reduced rewards.
-        if voyage["verification_mode"] == "marine_photo" and effective_mode == "self":
-            scale = 0.25
-        else:
-            scale = 1.0
-        bounty_awarded = int(voyage["base_bounty"] * scale)
-        base_berries = int(voyage["base_berries"] * scale)
+        bounty_awarded = int(voyage["base_bounty"])
+        base_berries = int(voyage["base_berries"])
+
+        # Bonus only when the photo was attached AND the verifier didn't
+        # outright reject it. Voyages without a verifier_prompt still grant
+        # the bonus for any uploaded photo (an honest evidence trail).
+        photo_accepted = image_bytes is not None and verdict != "self_reported_rejected"
+        verifier_rejected = (
+            verifier_result is not None and verifier_result.verdict == "rejected"
+        )
+        if image_bytes is not None and not verifier_rejected:
+            pct = int(voyage.get("evidence_bonus_pct") or 0)
+            if pct > 0:
+                bonus_bounty = int(round(voyage["base_bounty"] * pct / 100))
+                bonus_berries = int(round(voyage["base_berries"] * pct / 100))
+                bounty_awarded += bonus_bounty
+                base_berries += bonus_berries
+                bonus_applied = True
+
         berries_awarded, drop_info = _apply_loot(base_berries)
 
         captain_after = captain_mod.award_bounty(
@@ -422,7 +544,6 @@ async def attempt_voyage(
         if voyage["recurrence"] != "one_shot":
             with connect() as conn:
                 streak_after = _update_streak(conn, voyage_id, today)
-        # Reward a small morale tick on a successful daily run.
         captain_mod.change_morale(2)
 
         captain_mod.emit_event(
@@ -434,6 +555,8 @@ async def attempt_voyage(
                 "bounty": bounty_awarded,
                 "berries": berries_awarded,
                 "drop": drop_info,
+                "evidence": image_path,
+                "bonus_applied": bonus_applied,
             },
         )
 
@@ -460,6 +583,22 @@ async def attempt_voyage(
         )
         log_id = cur.lastrowid
 
+    if image_path is not None:
+        _record_evidence_media(
+            voyage_id=voyage_id,
+            log_id=log_id,
+            captured_at=attempted_at,
+            local_date=local_date,
+            local_time=local_time,
+            relative_path=image_path,
+            mime_type=image_mime,
+            size_bytes=image_size,
+            sha256=image_sha or "",
+            verdict=verdict,
+            confidence=confidence,
+            bonus_applied=bonus_applied,
+        )
+
     return {
         "log_id": log_id,
         "verdict": verdict,
@@ -467,6 +606,10 @@ async def attempt_voyage(
         "confidence": confidence,
         "bounty_awarded": bounty_awarded,
         "berries_awarded": berries_awarded,
+        "bonus_bounty": bonus_bounty,
+        "bonus_berries": bonus_berries,
+        "bonus_applied": bonus_applied,
+        "evidence_bonus_pct": int(voyage.get("evidence_bonus_pct") or 0),
         "drop": drop_info,
         "captain": captain_after,
         "streak": streak_after,

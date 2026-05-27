@@ -16,6 +16,8 @@ export type CaptainDTO = {
   next_island: { name: string; threshold: number } | null;
 };
 
+export type TimeWindow = "morning" | "midday" | "evening" | "night" | "anytime";
+
 export type VoyageDTO = {
   id: number;
   title: string;
@@ -30,6 +32,8 @@ export type VoyageDTO = {
   verifier_prompt: string | null;
   icon: string | null;
   theme_keyword: string | null;
+  time_window: TimeWindow;
+  evidence_bonus_pct: number;
   active: boolean;
   done_today?: boolean;
   today_attempt?: VoyageLogDTO | null;
@@ -78,6 +82,10 @@ export type AttemptResult = {
   confidence: number;
   bounty_awarded: number;
   berries_awarded: number;
+  bonus_bounty: number;
+  bonus_berries: number;
+  bonus_applied: boolean;
+  evidence_bonus_pct: number;
   drop: Drop;
   captain: CaptainDTO | null;
   streak: { current_streak: number; longest_streak: number; last_completed_date: string } | null;
