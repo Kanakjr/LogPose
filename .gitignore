@@ -40,3 +40,4 @@ out/
 # --- Logs / temp ---
 *.log
 scripts/.gen.log
+reports/
