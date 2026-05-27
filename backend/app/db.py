@@ -41,16 +41,21 @@ CREATE TABLE IF NOT EXISTS voyages (
     haki_affinity       TEXT    NOT NULL,         -- buso | vitality | kenbun | haoshoku
     base_bounty         INTEGER NOT NULL,
     base_berries        INTEGER NOT NULL,
-    verification_mode   TEXT    NOT NULL,         -- self | marine_photo | timer | stillness
+    verification_mode   TEXT    NOT NULL,         -- self | marine_photo (timer is legacy; treated as self)
     recurrence          TEXT    NOT NULL,         -- daily | weekly | one_shot
     cooldown_sec        INTEGER NOT NULL DEFAULT 0,
     category            TEXT    NOT NULL,         -- straw_hat_ritual | crew_duty | bounty_mission
-    verifier_prompt     TEXT,                     -- per-voyage hint for Marine Verifier
+    verifier_prompt     TEXT,                     -- per-voyage hint for Marine Verifier (used when photo is provided)
+    icon                TEXT,                     -- voyage icon key (see ui/src/lib/sprites.ts VoyageIcon)
+    theme_keyword       TEXT,                     -- short tag for sorting/filtering ("sleep", "movement", etc.)
+    time_window         TEXT    NOT NULL DEFAULT 'anytime',  -- morning | midday | evening | night | anytime
+    evidence_bonus_pct  INTEGER NOT NULL DEFAULT 25,         -- % bonus on top of base reward when a photo is provided
     active              INTEGER NOT NULL DEFAULT 1,
     created_at          INTEGER NOT NULL,
     updated_at          INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_voyages_recurrence ON voyages (recurrence, active);
+CREATE INDEX IF NOT EXISTS idx_voyages_time_window ON voyages (time_window, active);
 
 -- Every attempt at a voyage (verified or not, complete or not).
 CREATE TABLE IF NOT EXISTS voyage_log (
@@ -89,6 +94,30 @@ CREATE TABLE IF NOT EXISTS log_pose (
     last_completed_date TEXT                       -- YYYY-MM-DD local
 );
 
+-- Long-lived metadata for every uploaded evidence photo. Drives the future
+-- analytics dashboard ("show me my Sanji's Meal plates for the last 30 days",
+-- "how often did I produce evidence vs self-report") so we keep this even if
+-- a voyage_log row is later pruned.
+CREATE TABLE IF NOT EXISTS evidence_media (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    voyage_id       INTEGER NOT NULL REFERENCES voyages(id) ON DELETE CASCADE,
+    log_id          INTEGER REFERENCES voyage_log(id) ON DELETE SET NULL,
+    captured_at     INTEGER NOT NULL,           -- unix epoch seconds (UTC)
+    local_date      TEXT    NOT NULL,           -- YYYY-MM-DD in the configured tz
+    local_time      TEXT    NOT NULL,           -- HH:MM:SS in the configured tz
+    tz              TEXT    NOT NULL,           -- e.g. "Asia/Kolkata"
+    relative_path   TEXT    NOT NULL,           -- relative to media_root (parent of media_dir)
+    mime_type       TEXT,
+    size_bytes      INTEGER NOT NULL DEFAULT 0,
+    sha256          TEXT,
+    verdict         TEXT,                       -- verified | rejected | self_reported | timer_done
+    confidence      REAL,
+    bonus_applied   INTEGER NOT NULL DEFAULT 0  -- 1 if the +pct bonus was awarded
+);
+CREATE INDEX IF NOT EXISTS idx_evidence_voyage_date ON evidence_media (voyage_id, local_date);
+CREATE INDEX IF NOT EXISTS idx_evidence_local_date ON evidence_media (local_date DESC);
+CREATE INDEX IF NOT EXISTS idx_evidence_captured ON evidence_media (captured_at DESC);
+
 -- Append-only event stream for analytics and crew webhooks.
 CREATE TABLE IF NOT EXISTS events (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +135,7 @@ def init_db() -> None:
     Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        _ensure_voyage_columns(conn)
         row = conn.execute("SELECT id, name FROM captain WHERE id = 1").fetchone()
         if row is None:
             conn.execute(
@@ -118,6 +148,30 @@ def init_db() -> None:
                 "UPDATE captain SET name = ?, updated_at = ? WHERE id = 1",
                 (settings.captain_name, now_ts()),
             )
+
+
+def _ensure_voyage_columns(conn: sqlite3.Connection) -> None:
+    """Lightweight migrations: add columns that didn't exist in earlier
+    schemas. SQLite can't add columns via CREATE TABLE IF NOT EXISTS, so we
+    PRAGMA the table_info and ALTER if needed. Defaults are set so any row
+    inserted before the migration still satisfies the new contract.
+    """
+    existing = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(voyages)").fetchall()
+    }
+    if "icon" not in existing:
+        conn.execute("ALTER TABLE voyages ADD COLUMN icon TEXT")
+    if "theme_keyword" not in existing:
+        conn.execute("ALTER TABLE voyages ADD COLUMN theme_keyword TEXT")
+    if "time_window" not in existing:
+        conn.execute(
+            "ALTER TABLE voyages ADD COLUMN time_window TEXT NOT NULL DEFAULT 'anytime'"
+        )
+    if "evidence_bonus_pct" not in existing:
+        conn.execute(
+            "ALTER TABLE voyages ADD COLUMN evidence_bonus_pct INTEGER NOT NULL DEFAULT 25"
+        )
 
 
 @contextmanager

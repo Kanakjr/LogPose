@@ -49,6 +49,8 @@ class VoyageIn(BaseModel):
     cooldown_sec: int = Field(0, ge=0)
     category: str
     verifier_prompt: str | None = None
+    icon: str | None = None
+    theme_keyword: str | None = None
     active: bool = True
 
 
@@ -90,8 +92,8 @@ async def create_voyage(body: VoyageIn) -> dict:
             INSERT INTO voyages (
                 title, description, haki_affinity, base_bounty, base_berries,
                 verification_mode, recurrence, cooldown_sec, category,
-                verifier_prompt, active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verifier_prompt, icon, theme_keyword, active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 body.title,
@@ -104,6 +106,8 @@ async def create_voyage(body: VoyageIn) -> dict:
                 body.cooldown_sec,
                 body.category,
                 body.verifier_prompt,
+                body.icon,
+                body.theme_keyword,
                 1 if body.active else 0,
                 ts,
                 ts,
@@ -196,7 +200,8 @@ async def update_voyage(voyage_id: int, body: VoyageIn) -> dict:
             UPDATE voyages SET
                 title=?, description=?, haki_affinity=?, base_bounty=?,
                 base_berries=?, verification_mode=?, recurrence=?,
-                cooldown_sec=?, category=?, verifier_prompt=?, active=?,
+                cooldown_sec=?, category=?, verifier_prompt=?,
+                icon=?, theme_keyword=?, active=?,
                 updated_at=?
             WHERE id=?
             """,
@@ -211,6 +216,8 @@ async def update_voyage(voyage_id: int, body: VoyageIn) -> dict:
                 body.cooldown_sec,
                 body.category,
                 body.verifier_prompt,
+                body.icon,
+                body.theme_keyword,
                 1 if body.active else 0,
                 now_ts(),
                 voyage_id,
