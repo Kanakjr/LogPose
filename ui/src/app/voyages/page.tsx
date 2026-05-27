@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { getVoyages } from "@/lib/api";
+import { getVoyages, getVoyagesToday } from "@/lib/api";
 import type { VoyageDTO } from "@/lib/api";
 import { VoyageRail } from "@/components/VoyageRail";
 import { AnimatedList } from "@/components/magicui/animated-list";
@@ -23,8 +23,28 @@ export default function VoyagesPage() {
   const [tab, setTab] = useState<string>("all");
 
   useEffect(() => {
-    getVoyages()
-      .then((r) => setVoyages(r.voyages))
+    // Pull the full active set and overlay today's done/streak state so the
+    // same row that's struck-through on the home dashboard also shows the
+    // same state here. /voyages/today only returns daily-recurrence items,
+    // which is exactly the subset that has done_today/streak meaning.
+    Promise.all([getVoyages(), getVoyagesToday()])
+      .then(([all, today]) => {
+        const todayById = new Map<number, VoyageDTO>(
+          today.voyages.map((v) => [v.id, v]),
+        );
+        setVoyages(
+          all.voyages.map((v) => {
+            const t = todayById.get(v.id);
+            if (!t) return v;
+            return {
+              ...v,
+              done_today: t.done_today,
+              today_attempt: t.today_attempt ?? null,
+              streak: t.streak,
+            };
+          }),
+        );
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,8 +62,22 @@ export default function VoyagesPage() {
 
   if (loading)
     return (
-      <div className="mt-16 text-center text-sm text-zinc-500">
-        Loading voyages...
+      <div className="mx-auto w-full max-w-3xl space-y-3">
+        <div className="surface h-8 w-2/3 animate-pulse" />
+        <div className="surface h-12 animate-pulse" />
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="surface flex animate-pulse items-center gap-3 p-3"
+            style={{ animationDelay: `${i * 50}ms` }}
+          >
+            <div className="h-11 w-11 rounded-xl bg-white/5" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-2/3 rounded bg-white/5" />
+              <div className="h-2 w-1/3 rounded bg-white/5" />
+            </div>
+          </div>
+        ))}
       </div>
     );
 

@@ -30,7 +30,13 @@ const TABS = [
 export function DockNav() {
   const path = usePathname();
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3 lg:hidden">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3 lg:hidden"
+      // env(safe-area-inset-bottom) defends against iOS home-indicator
+      // overlap on notched devices; the static padding-bottom keeps the
+      // dock floating off the bottom edge on Android / web.
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+    >
       <Dock
         iconSize={42}
         iconMagnification={56}

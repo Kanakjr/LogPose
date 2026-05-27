@@ -23,13 +23,36 @@ export default function MapPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="mt-16 text-center text-sm text-zinc-500">
-        Unrolling the chart...
+      <div className="mx-auto w-full max-w-3xl space-y-3">
+        <div className="surface h-24 animate-pulse" />
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="surface flex animate-pulse items-center gap-3 p-3"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <div className="h-7 w-7 rounded-full bg-white/5" />
+            <div className="h-11 w-11 rounded-xl bg-white/5" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-1/2 rounded bg-white/5" />
+              <div className="h-2 w-1/4 rounded bg-white/5" />
+            </div>
+          </div>
+        ))}
       </div>
     );
-  if (!data) return null;
+  }
+  if (!data)
+    return (
+      <div className="surface mx-auto mt-16 max-w-md px-4 py-10 text-center">
+        <div className="text-sm text-zinc-200">The chart didn't load.</div>
+        <p className="mt-1 text-xs text-zinc-500">
+          The cartographer's Den Den Mushi rang busy. Reload to try again.
+        </p>
+      </div>
+    );
 
   const currentIdx = data.islands.findIndex((i) => i.current);
   const prevThreshold =

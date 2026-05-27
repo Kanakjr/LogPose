@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { CheckCircle2, XCircle, X } from "lucide-react";
 import { getJournal } from "@/lib/api";
 import type { VoyageLogDTO } from "@/lib/api";
 import { MagicCard } from "@/components/magicui/magic-card";
-import { HAKI_ACCENT } from "@/lib/sprites";
+import { PixelPortrait } from "@/components/PixelPortrait";
+import { HAKI_ACCENT, spritePath } from "@/lib/sprites";
 
 function fmtTime(ts: number) {
   return new Date(ts * 1000).toLocaleTimeString(undefined, {
@@ -82,9 +84,46 @@ export default function JournalPage() {
         </p>
       </header>
 
+      {grouped.size === 0 && loading && (
+        <div className="surface space-y-2 px-4 py-6">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="flex animate-pulse items-start gap-3 rounded-2xl bg-white/[0.02] px-3 py-3"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <div className="h-7 w-1 rounded-full bg-white/5" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-2/3 rounded bg-white/5" />
+                <div className="h-2 w-1/3 rounded bg-white/5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {grouped.size === 0 && !loading && (
-        <div className="surface px-4 py-10 text-center text-sm text-zinc-500">
-          Nothing logged yet. Today is a good day to start.
+        <div className="surface px-4 py-10 text-center">
+          <div className="mx-auto mb-3 flex w-fit">
+            <PixelPortrait
+              src={spritePath({ kind: "voyage", key: "scroll" })}
+              size={72}
+              rounded="rounded-2xl"
+              alt="An empty scroll"
+              idle
+            />
+          </div>
+          <div className="font-display text-sm text-zinc-200">
+            The logbook is blank.
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            Verify your first voyage and the journal writes itself.
+          </p>
+          <Link
+            href="/"
+            className="mt-4 inline-flex items-center gap-1 rounded-full bg-amber-400 px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-900 hover:bg-amber-300"
+          >
+            Find a voyage
+          </Link>
         </div>
       )}
 

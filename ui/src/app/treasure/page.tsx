@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
-import { Gem } from "lucide-react";
 import { getTreasure } from "@/lib/api";
 import type { TreasureGroup } from "@/lib/api";
 import { MagicCard } from "@/components/magicui/magic-card";
@@ -76,11 +76,27 @@ export default function TreasurePage() {
 
       {total === 0 && (
         <div className="surface px-4 py-10 text-center">
-          <Gem className="mx-auto mb-3 h-8 w-8 text-zinc-600" />
-          <div className="text-sm text-zinc-400">The chest sits empty.</div>
-          <div className="mt-1 text-xs text-zinc-500">
-            Verified voyages drop loot. Set sail.
+          <div className="mx-auto mb-3 flex w-fit">
+            <PixelPortrait
+              src={spritePath({ kind: "chest", key: "wood" })}
+              size={88}
+              rounded="rounded-2xl"
+              alt="Empty wooden chest"
+              idle
+            />
           </div>
+          <div className="font-display text-sm text-zinc-200">
+            The chest sits empty.
+          </div>
+          <div className="mt-1 text-xs text-zinc-500">
+            Verified voyages drop loot. Devil Fruits hide in here too.
+          </div>
+          <Link
+            href="/"
+            className="mt-4 inline-flex items-center gap-1 rounded-full bg-amber-400 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-zinc-900 transition hover:bg-amber-300"
+          >
+            Set sail
+          </Link>
         </div>
       )}
 

@@ -70,6 +70,31 @@
     background: var(--color-accent);
     color: #1a1a1a;
   }
+
+  /* Visible focus ring for keyboard users without harming pointer UX. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* Explicit override for elements that draw their own focus ring. */
+  textarea:focus-visible,
+  input:focus-visible {
+    outline-offset: 0;
+  }
+
+  /* Respect user motion preferences. We keep visibility, just kill the
+     fancy transitions/animations. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {

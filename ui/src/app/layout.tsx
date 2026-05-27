@@ -3,6 +3,8 @@ import "./globals.css";
 import { TopBar } from "@/components/TopBar";
 import { DockNav } from "@/components/DockNav";
 import { SideNav } from "@/components/SideNav";
+import { NudgeToast } from "@/components/NudgeToast";
+import { FirstRunTour } from "@/components/FirstRunTour";
 
 export const metadata: Metadata = {
   title: "LogPose",
@@ -38,8 +40,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen pb-28 lg:pb-12">
+      {/* Mobile: 8rem + iOS home-indicator inset to clear the floating
+          Dock. Desktop: no Dock, no safe-area, just normal padding. */}
+      <body className="min-h-screen pb-[calc(env(safe-area-inset-bottom,0px)+8rem)] lg:pb-12">
         <TopBar />
+        <NudgeToast />
         <div className="mx-auto w-full max-w-7xl px-4 lg:flex lg:gap-8 lg:px-8">
           <SideNav />
           <main className="mx-auto w-full max-w-2xl pt-4 lg:max-w-none lg:flex-1 lg:pt-6">
@@ -47,6 +52,7 @@ export default function RootLayout({
           </main>
         </div>
         <DockNav />
+        <FirstRunTour />
       </body>
     </html>
   );
