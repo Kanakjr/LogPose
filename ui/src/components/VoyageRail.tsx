@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { Camera, CheckCircle2, Clock, Wind, Flame } from "lucide-react";
 import type { VoyageDTO } from "@/lib/api";
 import { PixelPortrait } from "@/components/PixelPortrait";
-import { spritePath, voyageCategoryIcon, HAKI_ACCENT } from "@/lib/sprites";
+import { spritePath, voyageIcon, HAKI_ACCENT } from "@/lib/sprites";
 import { cn } from "@/lib/utils";
 
 const VERIFICATION_ICON = {
@@ -32,7 +32,7 @@ export function VoyageRail({
   const VerifyIcon =
     VERIFICATION_ICON[voyage.verification_mode] ?? CheckCircle2;
   const haki = HAKI_ACCENT[voyage.haki_affinity];
-  const icon = voyageCategoryIcon(voyage.category);
+  const icon = voyageIcon(voyage);
 
   const body = (
     <motion.div

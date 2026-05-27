@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { ArrowLeft, Camera, CheckCircle2, Clock, Flame, RotateCcw } from "lucide-react";
@@ -10,7 +10,10 @@ import { BorderBeam } from "@/components/magicui/border-beam";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { DropReveal } from "@/components/DropReveal";
 import { PixelPortrait } from "@/components/PixelPortrait";
-import { HAKI_ACCENT, HAKI_LABEL, spritePath, voyageCategoryIcon } from "@/lib/sprites";
+import { TimerStage } from "@/components/TimerStage";
+import { VictoryReinforce } from "@/components/VictoryReinforce";
+import { Term } from "@/components/Term";
+import { HAKI_ACCENT, HAKI_LABEL, spritePath, voyageIcon } from "@/lib/sprites";
 
 type Stage = "idle" | "captured" | "verifying" | "result";
 
@@ -45,7 +48,7 @@ export default function VoyageDetailPage() {
     setError(null);
   }
 
-  async function submit() {
+  const submit = useCallback(async () => {
     if (!voyage) return;
     setError(null);
     setStage("verifying");
@@ -64,7 +67,7 @@ export default function VoyageDetailPage() {
       setError(String(e));
       setStage(image ? "captured" : "idle");
     }
-  }
+  }, [voyage, voyageId, image]);
 
   function reset() {
     setImage(null);
@@ -88,6 +91,7 @@ export default function VoyageDetailPage() {
     );
 
   const isMarine = voyage.verification_mode === "marine_photo";
+  const isTimer = voyage.verification_mode === "timer";
   const haki = HAKI_ACCENT[voyage.haki_affinity];
   const streak = voyage.streak?.current ?? 0;
   const hasStreak = streak > 0;
@@ -109,7 +113,7 @@ export default function VoyageDetailPage() {
         )}
         <div className="flex items-start gap-3">
           <PixelPortrait
-            src={spritePath(voyageCategoryIcon(voyage.category))}
+            src={spritePath(voyageIcon(voyage))}
             size={64}
             rounded="rounded-2xl"
             alt=""
@@ -140,104 +144,115 @@ export default function VoyageDetailPage() {
 
       {/* Capture / submit */}
       {stage !== "result" && (
-        <div className="surface px-4 py-4">
-          {isMarine ? (
-            <>
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-                <Camera className="h-3.5 w-3.5" />
-                Marine verifier
-              </div>
-              <p className="mt-1 text-xs text-zinc-500">
-                Snap the proof. The Den Den Mushi will judge.
-              </p>
-              {preview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={preview}
-                  alt="evidence"
-                  className="mt-3 max-h-80 w-full rounded-2xl object-cover"
+        isTimer ? (
+          <TimerStage
+            voyageId={voyageId}
+            durationSec={voyage.cooldown_sec || 60}
+            title={voyage.title}
+            accentColor={haki}
+            submitting={stage === "verifying"}
+            onComplete={submit}
+            onAbort={() => router.back()}
+          />
+        ) : (
+          <div className="surface px-4 py-4">
+            {isMarine ? (
+              <>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                  <Camera className="h-3.5 w-3.5" />
+                  <Term k="marine_photo">Marine verifier</Term>
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Snap the proof. The Den Den Mushi will judge.
+                </p>
+                {preview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview}
+                    alt="evidence"
+                    className="mt-3 max-h-80 w-full rounded-2xl object-cover"
+                  />
+                ) : (
+                  <button
+                    onClick={() => inputRef.current?.click()}
+                    className="mt-3 flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] text-zinc-400 hover:bg-white/[0.04]"
+                  >
+                    <Camera className="h-7 w-7" />
+                    <span className="text-xs uppercase tracking-widest">
+                      Tap to capture
+                    </span>
+                  </button>
+                )}
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={onPick}
+                  className="hidden"
                 />
-              ) : (
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <Term k="self">Self report</Term>
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Mark it done when the deed is real.
+                </p>
+              </>
+            )}
+
+            {error && (
+              <div className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              {isMarine && preview && (
                 <button
-                  onClick={() => inputRef.current?.click()}
-                  className="mt-3 flex h-56 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] text-zinc-400 hover:bg-white/[0.04]"
+                  onClick={() => {
+                    setImage(null);
+                    setPreview(null);
+                    setStage("idle");
+                    if (inputRef.current) inputRef.current.value = "";
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/10 px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-300 hover:bg-white/5"
                 >
-                  <Camera className="h-7 w-7" />
-                  <span className="text-xs uppercase tracking-widest">
-                    Tap to capture
-                  </span>
+                  <RotateCcw className="h-3 w-3" />
+                  Retake
                 </button>
               )}
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={onPick}
-                className="hidden"
-              />
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-                {voyage.verification_mode === "timer" ? (
-                  <Clock className="h-3.5 w-3.5" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                )}
-                Self report
-              </div>
-              <p className="mt-1 text-xs text-zinc-500">
-                {voyage.verification_mode === "timer"
-                  ? "Run the timer in real life, then mark complete."
-                  : "Mark it done when the deed is real."}
-              </p>
-            </>
-          )}
-
-          {error && (
-            <div className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-4 flex gap-2">
-            {isMarine && preview && (
-              <button
-                onClick={() => {
-                  setImage(null);
-                  setPreview(null);
-                  setStage("idle");
-                  if (inputRef.current) inputRef.current.value = "";
-                }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/10 px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-300 hover:bg-white/5"
+              <ShimmerButton
+                onClick={submit}
+                disabled={stage === "verifying" || (isMarine && !image)}
+                borderRadius="9999px"
+                background="linear-gradient(135deg, #f59e0b, #f97316)"
+                shimmerColor="#fff5cc"
+                className="flex-1 text-xs uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <RotateCcw className="h-3 w-3" />
-                Retake
-              </button>
-            )}
-            <ShimmerButton
-              onClick={submit}
-              disabled={stage === "verifying" || (isMarine && !image)}
-              borderRadius="9999px"
-              background="linear-gradient(135deg, #f59e0b, #f97316)"
-              shimmerColor="#fff5cc"
-              className="flex-1 text-xs uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {stage === "verifying"
-                ? isMarine
-                  ? "Den Den Mushi calling..."
-                  : "Stamping..."
-                : isMarine
-                  ? "Submit"
-                  : "Mark complete"}
-            </ShimmerButton>
+                {stage === "verifying"
+                  ? isMarine
+                    ? "Den Den Mushi calling..."
+                    : "Stamping..."
+                  : isMarine
+                    ? "Submit"
+                    : "Mark complete"}
+              </ShimmerButton>
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {stage === "result" && result && (
-        <ResultPanel result={result} onClose={reset} onBack={() => router.back()} />
+        <>
+          <ResultPanel result={result} onClose={reset} onBack={() => router.back()} />
+          {["verified", "self_reported", "timer_done"].includes(result.verdict) && (
+            <VictoryReinforce voyage={voyage} result={result} />
+          )}
+        </>
       )}
 
       <DropReveal
