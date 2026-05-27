@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surfaces */
+  --color-surface-0: #0a0a0f;
+  --color-surface-1: #15151f;
+  --color-surface-2: #1e1e2e;
+  --color-surface-3: #2a2a3d;
+
+  /* Stat accents */
+  --color-stat-morale-from: #ef4444;
+  --color-stat-morale-to: #f97316;
+  --color-stat-bounty-from: #facc15;
+  --color-stat-bounty-to: #f59e0b;
+  --color-stat-berries-from: #38bdf8;
+  --color-stat-berries-to: #6366f1;
+
+  /* Haki colors (modernized) */
+  --color-haki-buso: #ef4444;
+  --color-haki-vitality: #22c55e;
+  --color-haki-kenbun: #38bdf8;
+  --color-haki-haoshoku: #facc15;
+
+  /* Crew accents - keyed to provided sprite background tiles */
+  --color-crew-luffy: #c8e6c8;
+  --color-crew-zoro: #c5d8e9;
+  --color-crew-nami: #f4e8b4;
+  --color-crew-robin: #d6c8e0;
+  --color-crew-chopper: #f4c8c8;
+
+  /* Rarity */
+  --color-rarity-common: #9ca3af;
+  --color-rarity-rare: #60a5fa;
+  --color-rarity-legendary: #a855f7;
+  --color-rarity-mythic-from: #f59e0b;
+  --color-rarity-mythic-to: #ec4899;
+
+  /* Brand */
+  --color-accent: #facc15;
+  --color-accent-soft: #f59e0b;
+
+  /* Theme integration for components that expect default tokens */
+  --color-background: #0a0a0f;
+  --color-foreground: #f5f5f7;
+  --color-border: #2a2a3d;
+  --color-primary: #facc15;
+  --color-muted-foreground: #71717a;
+
+  /* Typography */
+  --font-display: "Outfit", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    background:
+      radial-gradient(60% 60% at 20% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 70%),
+      radial-gradient(60% 50% at 90% 20%, rgba(236, 72, 153, 0.08) 0%, transparent 70%),
+      radial-gradient(45% 45% at 50% 100%, rgba(250, 204, 21, 0.05) 0%, transparent 70%),
+      var(--color-surface-0);
+    color: #e4e4e7;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: #1a1a1a;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Generic surface card */
+  .surface {
+    background: rgba(30, 30, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+    backdrop-filter: blur(8px);
+  }
+  .surface-soft {
+    background: rgba(30, 30, 46, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+  }
+}
+
+/* ----------------------------------------------------------------
+   Animations used by Magic UI components
+   ---------------------------------------------------------------- */
+
+@keyframes aurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-aurora {
+  animation: aurora 10s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+  0% { transform: translate(-100%, 0); }
+  100% { transform: translate(100%, 0); }
+}
+.animate-shimmer-slide {
+  animation: shimmer-slide var(--speed, 3s) ease-in-out infinite;
+}
+
+@keyframes spin-around {
+  0% { transform: translateZ(0) rotate(0); }
+  15%, 35% { transform: translateZ(0) rotate(90deg); }
+  65%, 85% { transform: translateZ(0) rotate(270deg); }
+  100% { transform: translateZ(0) rotate(360deg); }
+}
+.animate-spin-around {
+  animation: spin-around calc(var(--speed, 3s) * 2) infinite linear;
+}
+
+@keyframes meteor {
+  0% { transform: rotate(var(--angle)) translateX(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: rotate(var(--angle)) translateX(-500px); opacity: 0; }
+}
+.animate-meteor {
+  animation: meteor 5s linear infinite;
+}
+
+@keyframes ripple {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+.animate-ripple {
+  animation: ripple var(--duration, 2.4s) ease calc(var(--i, 0) * 0.18s) infinite;
+}
+
+@keyframes background-position-spin {
+  0% { background-position: top center; }
+  100% { background-position: bottom center; }
+}
+.animate-background-position-spin {
+  animation: background-position-spin 3s ease infinite;
+}
+
+/* Pixel-art rendering for img sprites */
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Typing dots indicator */
+@keyframes typing-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.typing-dot {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+
+/* Pulse glow for ready states */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
+  50% { box-shadow: 0 0 24px 4px rgba(250, 204, 21, 0.35); }
+}
+.glow-pulse {
+  animation: glow-pulse 2.6s ease-in-out infinite;
+}
+
+/* Verdict reveal */
+@keyframes verdict-flash {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.verdict-flash {
+  animation: verdict-flash 0.5s ease-out;
+}
+
+/* Safe area helpers for PWA */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
