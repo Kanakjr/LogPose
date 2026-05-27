@@ -1,0 +1,42 @@
+# --- Secrets ---
+# Per-service env files are loaded into containers at runtime.
+# Only the top-level .env.example is committed.
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# --- Runtime data ---
+# Keep the directory layout via .gitkeep but ignore the actual runtime files.
+backend/data/bounty.db
+backend/data/bounty.db-journal
+backend/data/media/*
+!backend/data/media/.gitkeep
+crew/data/crew.db
+crew/data/crew.db-journal
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# --- Editor / OS ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Logs / temp ---
+*.log
+scripts/.gen.log

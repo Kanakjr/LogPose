@@ -1,0 +1,97 @@
+services:
+  logpose-backend:
+    build: ./backend
+    container_name: logpose-backend
+    environment:
+      - TZ=${TZ:-Asia/Kolkata}
+      - LOGPOSE_API_KEY=${LOGPOSE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - CREW_URL=http://logpose-crew:8325
+      - CREW_INTERNAL_KEY=${LOGPOSE_CREW_INTERNAL_KEY}
+      - LOGPOSE_TZ=${TZ:-Asia/Kolkata}
+      - ROLLOVER_HOUR=${LOGPOSE_ROLLOVER_HOUR:-4}
+      - DB_PATH=/app/data/bounty.db
+      - MEDIA_DIR=/app/data/media
+    volumes:
+      - ./backend/data:/app/data
+    ports:
+      - "8324:8324"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8324/api/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  logpose-crew:
+    build: ./crew
+    container_name: logpose-crew
+    environment:
+      - TZ=${TZ:-Asia/Kolkata}
+      - LOGPOSE_CREW_KEY=${LOGPOSE_CREW_KEY}
+      - CREW_INTERNAL_KEY=${LOGPOSE_CREW_INTERNAL_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GAME_BACKEND_URL=http://logpose-backend:8324
+      - LOGPOSE_API_KEY=${LOGPOSE_API_KEY}
+      - LOGPOSE_TZ=${TZ:-Asia/Kolkata}
+      - OBSIDIAN_VAULT_PATH=/app/obsidian
+      - HUBERMAN_CODEX_PATH=/app/data/huberman
+      - DB_PATH=/app/data/crew.db
+    volumes:
+      - ./crew/data:/app/data
+      # Optional: mount your Obsidian vault read-only so Robin / Chopper can
+      # cite your notes. Set OBSIDIAN_VAULT_PATH in .env (absolute host path).
+      # If you don't have one, comment this out.
+      - ${OBSIDIAN_VAULT_PATH:-./crew/data/_no_obsidian}:/app/obsidian:ro
+    ports:
+      - "8325:8325"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8325/api/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      - logpose-backend
+
+  logpose-ui:
+    build: ./ui
+    container_name: logpose-ui
+    environment:
+      - HOSTNAME=0.0.0.0
+      - BACKEND_URL=http://logpose-backend:8324
+      - CREW_URL=http://logpose-crew:8325
+      - LOGPOSE_API_KEY=${LOGPOSE_API_KEY}
+      - LOGPOSE_CREW_KEY=${LOGPOSE_CREW_KEY}
+    ports:
+      - "3005:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      - logpose-backend
+      - logpose-crew
