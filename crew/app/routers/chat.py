@@ -246,6 +246,111 @@ async def one_on_one(crewmate: str, body: ChatIn) -> StreamingResponse:
     )
 
 
+# ----------------------------------------------------------------- one-liner
+#
+# Tiny non-persistent endpoint used by the UI after a successful voyage to
+# pull a single ~one-sentence quip from the appropriate crewmate. It does
+# NOT write to crew_chat (these aren't conversations, they're rewards) and
+# it imposes a hard 50-token cap on the model to keep latency low.
+
+
+class OneLinerIn(BaseModel):
+    intent: str = Field(..., min_length=1, max_length=64)
+    payload: dict = Field(default_factory=dict)
+
+
+@router.post("/crew/{crewmate}/one_liner")
+async def crew_one_liner(crewmate: str, body: OneLinerIn) -> dict:
+    if crewmate not in CREW:
+        raise HTTPException(404, "unknown crewmate")
+    if not settings.gemini_api_key:
+        return {"crewmate": crewmate, "content": _fallback_one_liner(crewmate, body.intent)}
+
+    bundle = await captain_state_bundle()
+    persona_skills = CREW[crewmate].skills
+    context_block = render_context_block(bundle, persona_skills)
+
+    # Compose a single short user message that hints at the intent.
+    if body.intent == "victory":
+        title = str(body.payload.get("title") or "a voyage")
+        user_msg = (
+            f"Captain just cleared '{title}'. Reply in ONE short sentence, "
+            "in your voice. No quest names, no stat numbers, no salutation."
+        )
+    else:
+        user_msg = (
+            f"Intent: {body.intent}. Reply in ONE short sentence in your "
+            "voice. No salutation, no list of options."
+        )
+
+    from app.llm import _get_client  # local import to avoid circulars
+
+    try:
+        from google.genai import types as genai_types
+
+        client = _get_client()
+        # Build a tiny persona-only system prompt so we keep cost low.
+        from app.llm import _PROMPTS_DIR
+
+        persona_md = (_PROMPTS_DIR / f"crew/{crewmate}.md").read_text(encoding="utf-8")
+        system = (
+            persona_md
+            + "\n\n# Rule\nReply in ONE short sentence. No tags, no actions, "
+            "no salutations, no lists. Just a single line of voice."
+            + "\n\n" + context_block
+        )
+        resp = await asyncio.to_thread(
+            client.models.generate_content,
+            model=settings.gemini_model,
+            contents=[
+                genai_types.Content(
+                    role="user",
+                    parts=[genai_types.Part.from_text(text=user_msg)],
+                )
+            ],
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=0.9,
+                thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                max_output_tokens=80,
+            ),
+        )
+        text = (getattr(resp, "text", None) or "").strip()
+        if not text:
+            text = _fallback_one_liner(crewmate, body.intent)
+        # Strip any stray tagged blocks the model might have emitted.
+        text = _strip_tags(text)
+        return {"crewmate": crewmate, "content": text}
+    except Exception as exc:
+        log.warning("one_liner failed: %s", exc)
+        return {"crewmate": crewmate, "content": _fallback_one_liner(crewmate, body.intent)}
+
+
+_TAG_RE = None
+
+
+def _strip_tags(s: str) -> str:
+    import re as _re
+
+    global _TAG_RE
+    if _TAG_RE is None:
+        _TAG_RE = _re.compile(r"</?[a-z_][a-z_0-9]*>", _re.IGNORECASE)
+    return _TAG_RE.sub("", s).strip()
+
+
+def _fallback_one_liner(crewmate: str, intent: str) -> str:
+    if intent != "victory":
+        return "Aye."
+    # Offline / API-down fallback so the UI never shows blank.
+    return {
+        "luffy": "Yosh! Keep going!",
+        "zoro": "Good. Again tomorrow.",
+        "nami": "Logged. The course holds.",
+        "robin": "Consistency compounds.",
+        "chopper": "Nice. Tiny win, real impact.",
+    }.get(crewmate, "Nice work.")
+
+
 # ----------------------------------------------------------------- nudges
 
 
