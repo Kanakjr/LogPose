@@ -39,15 +39,15 @@ const GLOSSARY: Record<string, { title: string; body: string }> = {
   },
   marine_photo: {
     title: "Marine Verifier",
-    body: "Gemini Vision judges your photo against the voyage's verifier prompt. Cheating is hard - the model knows what a real meal vs a candy wrapper looks like.",
+    body: "Optional. Snap a photo and Gemini Vision judges it against the voyage's verifier prompt. A clean verdict adds the evidence bonus on top of the base reward.",
   },
   self: {
-    title: "Self report",
-    body: "Tap to mark done on the honor system. Used for actions that can't be photographed (taking a pill, etc.). Worth full bounty.",
+    title: "Mark complete",
+    body: "Tap when the deed is real. Always grants the base bounty + berries on the honor system. Add an optional photo for the evidence bonus.",
   },
-  timer: {
-    title: "Timer voyage",
-    body: "Tap Start, wait it out, the app marks complete when the countdown hits zero. Used for Sanji's Brew (90 min wait), cold exposure, NSDR.",
+  evidence_bonus: {
+    title: "Evidence bonus",
+    body: "Each voyage has a percentage bonus (typically 15-35%) added to bounty + berries when you attach a photo. The image is timestamped in Asia/Kolkata and stored for your future analytics dashboard.",
   },
 };
 
