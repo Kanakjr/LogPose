@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { getVoyages, getVoyagesToday } from "@/lib/api";
 import type { VoyageDTO } from "@/lib/api";
-import { VoyageRail } from "@/components/VoyageRail";
-import { AnimatedList } from "@/components/magicui/animated-list";
+import { VoyageGroups } from "@/components/VoyageGroups";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -124,11 +123,7 @@ export default function VoyagesPage() {
           Nothing here yet. Ask the crew to suggest one.
         </div>
       ) : (
-        <AnimatedList delay={60}>
-          {visible.map((v) => (
-            <VoyageRail key={v.id} voyage={v} href={`/voyages/${v.id}`} />
-          ))}
-        </AnimatedList>
+        <VoyageGroups voyages={visible} hrefBase="/voyages" />
       )}
     </div>
   );

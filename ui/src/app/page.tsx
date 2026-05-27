@@ -6,11 +6,10 @@ import { getCaptain, getMap, getVoyagesToday } from "@/lib/api";
 import type { CaptainDTO, GrandLineDTO, VoyageDTO } from "@/lib/api";
 import { CharacterHero } from "@/components/CharacterHero";
 import { HakiRings } from "@/components/HakiRings";
-import { VoyageRail } from "@/components/VoyageRail";
+import { VoyageGroups } from "@/components/VoyageGroups";
 import { IslandStrip } from "@/components/IslandStrip";
 import { NextUpCard } from "@/components/NextUpCard";
 import { DailyRecap } from "@/components/DailyRecap";
-import { AnimatedList } from "@/components/magicui/animated-list";
 import { AnimatedCircularProgressBar } from "@/components/magicui/animated-circular-progress-bar";
 
 export default function HomePage() {
@@ -127,7 +126,7 @@ export default function HomePage() {
   const nextUp = voyages.find((v) => !v.done_today) ?? null;
 
   const voyagesSection = (
-    <section className="space-y-2">
+    <section className="space-y-3">
       <div className="flex items-baseline justify-between px-1">
         <h2 className="font-display text-xs font-semibold uppercase tracking-widest text-zinc-400">
           Daily voyages
@@ -136,17 +135,7 @@ export default function HomePage() {
           {done}/{total} done
         </span>
       </div>
-      {total === 0 ? (
-        <div className="surface px-4 py-6 text-center text-sm text-zinc-500">
-          No voyages scheduled. Ask the crew on the Den Den Mushi.
-        </div>
-      ) : (
-        <AnimatedList delay={80}>
-          {voyages.map((v) => (
-            <VoyageRail key={v.id} voyage={v} href={`/voyages/${v.id}`} />
-          ))}
-        </AnimatedList>
-      )}
+      <VoyageGroups voyages={voyages} hrefBase="/voyages" />
     </section>
   );
 
