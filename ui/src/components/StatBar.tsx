@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  label: string;
+  label: React.ReactNode;
   value: number;
   max: number;
   /** Gradient stops. */

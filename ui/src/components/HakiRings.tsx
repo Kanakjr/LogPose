@@ -2,6 +2,7 @@
 
 import type { CaptainDTO, Haki } from "@/lib/api";
 import { AnimatedCircularProgressBar } from "@/components/magicui/animated-circular-progress-bar";
+import { Term } from "@/components/Term";
 import { HAKI_ACCENT, HAKI_LABEL } from "@/lib/sprites";
 
 const KEYS: Haki[] = ["buso", "vitality", "kenbun", "haoshoku"];
@@ -33,15 +34,19 @@ export function HakiRings({ captain }: { captain: CaptainDTO }) {
               className="size-16"
             />
             <div className="-mt-12 flex flex-col items-center">
-              <span className="font-mono text-base font-semibold leading-none" style={{ color }}>
+              <span
+                className="font-mono text-base font-semibold leading-none"
+                style={{ color }}
+                aria-label={`${HAKI_LABEL[k]} Haki, level ${level}`}
+              >
                 {level}
               </span>
-              <span className="mt-0.5 text-[9px] font-medium uppercase tracking-widest text-zinc-500">
+              <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-zinc-500">
                 Lv
               </span>
             </div>
-            <span className="mt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
-              {HAKI_LABEL[k]}
+            <span className="mt-1 text-[11px] font-medium uppercase tracking-wider text-zinc-300">
+              <Term k={k}>{HAKI_LABEL[k]}</Term>
             </span>
           </div>
         );
